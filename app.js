@@ -7,7 +7,7 @@ const app = express();
 app.use(express.json());
 
 // Tag routes
-app.use("/tag", tagRoutes);
+app.use("/tags", tagRoutes);
 
 // MongoDB connection
 mongoose

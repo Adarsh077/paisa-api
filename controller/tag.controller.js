@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Tag = require("../model/tag.model");
 
 exports.getAllTags = async (req, res) => {
@@ -26,7 +27,10 @@ exports.createTag = async (req, res) => {
 exports.deleteTag = async (req, res) => {
   try {
     const { tagId } = req.params;
-    const tag = await Tag.findById(tagId);
+    const tag = await Tag.findOne({
+      _id: mongoose.Types.ObjectId.createFromHexString(tagId),
+      deleted: false,
+    });
     if (!tag) {
       return res.status(404).json({ error: "Tag not found" });
     }
@@ -46,7 +50,14 @@ exports.updateTag = async (req, res) => {
     if (!label) {
       return res.status(400).json({ error: "Label is required" });
     }
-    const tag = await Tag.findByIdAndUpdate(tagId, { label }, { new: true });
+    const tag = await Tag.findOneAndUpdate(
+      {
+        _id: mongoose.Types.ObjectId.createFromHexString(tagId),
+        deleted: false,
+      },
+      { label },
+      { new: true }
+    );
     if (!tag) {
       return res.status(404).json({ error: "Tag not found" });
     }
