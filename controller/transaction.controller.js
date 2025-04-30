@@ -50,10 +50,15 @@ exports.getTransactionById = async (req, res) => {
 // Create a new transaction
 exports.createTransaction = async (req, res) => {
   try {
-    const { label, amount, type, tags, date } = req.body;
+    let { label, amount, type, tags, date  } = req.body;
     if (!label || !amount || !type) {
       return res.status(400).json({ error: "Missing required fields" });
     }
+    if(!date) {
+      date = Date.now()
+    }
+    
+
     const newTransaction = new Transaction({
       label,
       amount,
@@ -64,6 +69,7 @@ exports.createTransaction = async (req, res) => {
     const savedTransaction = await newTransaction.save();
     res.status(201).json(savedTransaction);
   } catch (err) {
+    console.log(err)
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -72,7 +78,12 @@ exports.createTransaction = async (req, res) => {
 exports.updateTransaction = async (req, res) => {
   try {
     const { transactionId } = req.params;
-    const update = req.body;
+    const { label, tags, date, amount } = req.body;
+    const update = {};
+    if (label) update.label = label;
+    if (tags) update.tags = tags;
+    if (date) update.date = date;
+    if (amount) update.amount = amount;
     const transaction = await Transaction.findOneAndUpdate(
       {
         _id: mongoose.Types.ObjectId.createFromHexString(transactionId),
@@ -86,6 +97,8 @@ exports.updateTransaction = async (req, res) => {
     }
     res.json(transaction);
   } catch (err) {
+    console.log(err)
+
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -105,6 +118,8 @@ exports.deleteTransaction = async (req, res) => {
     await transaction.save();
     res.json({ message: "Transaction deleted" });
   } catch (err) {
+    console.log(err)
+
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -185,6 +200,8 @@ exports.searchTransactions = async (req, res) => {
     const results = await Transaction.aggregate(pipeline);
     res.json(results);
   } catch (err) {
+    console.log(err)
+
     res.status(500).json({ error: "Server error" });
   }
 };
