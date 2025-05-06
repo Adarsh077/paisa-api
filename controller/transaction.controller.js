@@ -23,7 +23,9 @@ exports.getAllTransactions = async (req, res) => {
       if (endDate) filter.date.$lte = new Date(endDate);
     }
 
-    const transactions = await Transaction.find(filter).populate("tags");
+    const transactions = await Transaction.find(filter)
+      .populate("tags")
+      .sort({ date: -1 });
     res.json(transactions);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
@@ -50,14 +52,13 @@ exports.getTransactionById = async (req, res) => {
 // Create a new transaction
 exports.createTransaction = async (req, res) => {
   try {
-    let { label, amount, type, tags, date  } = req.body;
+    let { label, amount, type, tags, date } = req.body;
     if (!label || !amount || !type) {
       return res.status(400).json({ error: "Missing required fields" });
     }
-    if(!date) {
-      date = Date.now()
+    if (!date) {
+      date = Date.now();
     }
-    
 
     const newTransaction = new Transaction({
       label,
@@ -69,7 +70,7 @@ exports.createTransaction = async (req, res) => {
     const savedTransaction = await newTransaction.save();
     res.status(201).json(savedTransaction);
   } catch (err) {
-    console.log(err)
+    console.log(err);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -97,7 +98,7 @@ exports.updateTransaction = async (req, res) => {
     }
     res.json(transaction);
   } catch (err) {
-    console.log(err)
+    console.log(err);
 
     res.status(500).json({ error: "Server error" });
   }
@@ -118,7 +119,7 @@ exports.deleteTransaction = async (req, res) => {
     await transaction.save();
     res.json({ message: "Transaction deleted" });
   } catch (err) {
-    console.log(err)
+    console.log(err);
 
     res.status(500).json({ error: "Server error" });
   }
@@ -200,7 +201,7 @@ exports.searchTransactions = async (req, res) => {
     const results = await Transaction.aggregate(pipeline);
     res.json(results);
   } catch (err) {
-    console.log(err)
+    console.log(err);
 
     res.status(500).json({ error: "Server error" });
   }
