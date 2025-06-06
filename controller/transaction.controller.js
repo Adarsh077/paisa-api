@@ -1,11 +1,21 @@
 const mongoose = require("mongoose");
 const Transaction = require("../model/transaction.model");
 
-// Get all transactions (excluding deleted)
+// Get all transactions (excluding deleted) with cursor-based pagination
 exports.getAllTransactions = async (req, res) => {
   try {
-    const { tags, type, startDate, endDate } = req.query;
+    const {
+      tags,
+      type,
+      startDate,
+      endDate,
+      cursor,
+      limit = 20,
+      direction = "next",
+    } = req.query;
+
     const filter = { deleted: false };
+    const limitNum = Math.min(parseInt(limit, 10) || 20, 100); // Max 100 items per page
 
     if (type) {
       filter.type = type;
@@ -23,11 +33,52 @@ exports.getAllTransactions = async (req, res) => {
       if (endDate) filter.date.$lte = new Date(endDate);
     }
 
+    // Add cursor-based pagination
+    if (cursor) {
+      try {
+        const cursorId = mongoose.Types.ObjectId.createFromHexString(cursor);
+        if (direction === "prev") {
+          filter._id = { $gt: cursorId };
+        } else {
+          filter._id = { $lt: cursorId };
+        }
+      } catch (err) {
+        return res.status(400).json({ error: "Invalid cursor format" });
+      }
+    }
+
+    // Always sort in descending order (newest first) for consistent behavior
+    const sortOrder = { date: -1 };
+
     const transactions = await Transaction.find(filter)
       .populate("tags")
-      .sort({ date: -1 });
-    res.json(transactions);
+      .sort(sortOrder)
+      .limit(limitNum + 1); // Fetch one extra to check if there are more
+
+    // Check if there are more items
+    const hasMore = transactions.length > limitNum;
+    const items = hasMore ? transactions.slice(0, limitNum) : transactions;
+
+    // Generate pagination info
+    const pagination = {
+      hasNext: direction === "next" ? hasMore : items.length > 0,
+      hasPrev: direction === "prev" ? hasMore : cursor != null,
+      nextCursor: null,
+      prevCursor: null,
+    };
+
+    if (items.length > 0) {
+      pagination.nextCursor = items[items.length - 1]._id.toString();
+      pagination.prevCursor = items[0]._id.toString();
+    }
+
+    res.json({
+      data: items,
+      pagination,
+      total: items.length,
+    });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -125,11 +176,31 @@ exports.deleteTransaction = async (req, res) => {
   }
 };
 
-// Search transactions by label, tags, and date range using MongoDB Atlas Search
+// Search transactions by label, tags, and date range using MongoDB Atlas Search with page-based pagination
 exports.searchTransactions = async (req, res) => {
   try {
-    const { label, tags, startDate, endDate, select } = req.query;
+    const {
+      label,
+      tags,
+      startDate,
+      endDate,
+      select,
+      page = 1,
+      limit = 20,
+    } = req.query;
+
+    const limitNum = Math.min(parseInt(limit, 10) || 20, 100); // Max 100 items per page
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1); // Minimum page 1
+    const skip = (pageNum - 1) * limitNum;
     const must = [];
+
+    // Always exclude deleted
+    must.push({
+      equals: {
+        path: "deleted",
+        value: false,
+      },
+    });
 
     if (label) {
       must.push({
@@ -160,15 +231,6 @@ exports.searchTransactions = async (req, res) => {
       });
     }
 
-    // Always exclude deleted
-    must.push({
-      equals: {
-        path: "deleted",
-        value: false,
-      },
-    });
-    console.log(must);
-
     const pipeline = [
       {
         $search: {
@@ -178,7 +240,9 @@ exports.searchTransactions = async (req, res) => {
           },
         },
       },
-      { $sort: { date: -1 } },
+      { $sort: { date: -1, _id: -1 } }, // Sort first for consistent ordering
+      { $skip: skip }, // Skip documents for pagination
+      { $limit: limitNum + 1 }, // Fetch one extra to check if there are more
     ];
 
     // Add projection if select is provided
@@ -197,12 +261,28 @@ exports.searchTransactions = async (req, res) => {
         pipeline.push({ $project: project });
       }
     }
-
+    console.log(JSON.stringify(pipeline, null, 2));
     const results = await Transaction.aggregate(pipeline);
-    res.json(results);
-  } catch (err) {
-    console.log(err);
 
+    // Check if there are more items
+    const hasNext = results.length > limitNum;
+    const items = hasNext ? results.slice(0, limitNum) : results;
+
+    // Generate pagination info
+    const pagination = {
+      currentPage: pageNum,
+      limit: limitNum,
+      hasNext,
+      totalItemsOnPage: items.length,
+    };
+
+    res.json({
+      data: items,
+      pagination,
+      hasNext, // Include hasNext at top level as requested
+    });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 };

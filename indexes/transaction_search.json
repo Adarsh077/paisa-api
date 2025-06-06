@@ -2,6 +2,9 @@
   "mappings": {
     "dynamic": false,
     "fields": {
+      "_id": {
+        "type": "objectId"
+      },
       "label": {
         "type": "string"
       },
