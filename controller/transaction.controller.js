@@ -182,6 +182,7 @@ exports.searchTransactions = async (req, res) => {
     const {
       label,
       tags,
+      type,
       startDate,
       endDate,
       select,
@@ -207,6 +208,15 @@ exports.searchTransactions = async (req, res) => {
         text: {
           query: label,
           path: "label",
+        },
+      });
+    }
+
+    if (type) {
+      must.push({
+        text: {
+          path: "type",
+          query: type,
         },
       });
     }
@@ -261,7 +271,7 @@ exports.searchTransactions = async (req, res) => {
         pipeline.push({ $project: project });
       }
     }
-    console.log(JSON.stringify(pipeline, null, 2));
+
     const results = await Transaction.aggregate(pipeline);
 
     // Check if there are more items

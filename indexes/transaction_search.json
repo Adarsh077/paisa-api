@@ -16,6 +16,9 @@
       },
       "deleted": {
         "type": "boolean"
+      },
+      "type": {
+        "type": "string"
       }
     }
   }
