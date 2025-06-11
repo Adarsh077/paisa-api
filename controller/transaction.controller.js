@@ -113,7 +113,7 @@ exports.createTransaction = async (req, res) => {
 
     const newTransaction = new Transaction({
       label,
-      amount,
+      amount: Math.abs(amount),
       type,
       tags,
       date,
