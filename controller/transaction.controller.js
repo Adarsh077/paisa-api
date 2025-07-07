@@ -225,9 +225,9 @@ exports.searchTransactions = async (req, res) => {
       // tags can be a comma-separated list
       const tagList = Array.isArray(tags) ? tags : tags.split(",");
       must.push({
-        terms: {
-          query: tagList,
+        in: {
           path: "tags",
+          value: tagList.map((tag) => new mongoose.Types.ObjectId(tag.trim())),
         },
       });
     }
