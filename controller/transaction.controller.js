@@ -4,7 +4,7 @@ const Transaction = require("../model/transaction.model");
 // Get all transactions (excluding deleted) with cursor-based pagination
 exports.getAllTransactions = async (req, res) => {
   try {
-    const {
+    let {
       tags,
       type,
       startDate,
@@ -12,6 +12,7 @@ exports.getAllTransactions = async (req, res) => {
       cursor,
       limit = 20,
       direction = "next",
+      _ids,
     } = req.query;
 
     const filter = { deleted: false };
@@ -21,12 +22,28 @@ exports.getAllTransactions = async (req, res) => {
       filter.type = type;
     }
 
-    if (tags) {
-      // tags can be a comma-separated list
-      const tagList = Array.isArray(tags) ? tags : tags.split(",");
-      filter.tags = { $in: tagList };
+    if (_ids) {
+      const idList = Array.isArray(_ids) ? _ids : _ids.split(",");
+      filter._id = {
+        $in: idList.map((id) =>
+          mongoose.Types.ObjectId.createFromHexString(id)
+        ),
+      };
     }
 
+    if (typeof tags === "string" && tags.toLowerCase() === "none") {
+      tags = [];
+    }
+
+    if (tags) {
+      if (Array.isArray(tags) && tags.length === 0) {
+        filter["tags.0"] = { $exists: false };
+      } else {
+        // tags can be a comma-separated list
+        const tagList = Array.isArray(tags) ? tags : tags.split(",");
+        filter.tags = { $in: tagList };
+      }
+    }
     if (startDate || endDate) {
       filter.date = {};
       if (startDate) filter.date.$gte = new Date(startDate);
@@ -179,7 +196,7 @@ exports.deleteTransaction = async (req, res) => {
 // Search transactions by label, tags, and date range using MongoDB Atlas Search with page-based pagination
 exports.searchTransactions = async (req, res) => {
   try {
-    const {
+    let {
       label,
       tags,
       type,
@@ -189,6 +206,10 @@ exports.searchTransactions = async (req, res) => {
       page = 1,
       limit = 20,
     } = req.query;
+
+    if (typeof tags === "string" && tags.toLocaleLowerCase() === "none") {
+      tags = [];
+    }
 
     const limitNum = Math.min(parseInt(limit, 10) || 20, 100); // Max 100 items per page
     const pageNum = Math.max(parseInt(page, 10) || 1, 1); // Minimum page 1
@@ -222,14 +243,26 @@ exports.searchTransactions = async (req, res) => {
     }
 
     if (tags) {
-      // tags can be a comma-separated list
+      // tags can be a comma-separated list or an array
       const tagList = Array.isArray(tags) ? tags : tags.split(",");
-      must.push({
-        in: {
-          path: "tags",
-          value: tagList.map((tag) => new mongoose.Types.ObjectId(tag.trim())),
-        },
-      });
+      if (Array.isArray(tags) && tags.length === 0) {
+        // If tags is an empty array, find transactions with no tags attached
+        must.push({
+          equals: {
+            path: "tags",
+            value: [],
+          },
+        });
+      } else {
+        must.push({
+          in: {
+            path: "tags",
+            value: tagList.map(
+              (tag) => new mongoose.Types.ObjectId(tag.trim())
+            ),
+          },
+        });
+      }
     }
 
     if (startDate || endDate) {
