@@ -3,7 +3,9 @@ const Tag = require("../model/tag.model");
 
 exports.getAllTags = async (req, res) => {
   try {
-    const tags = await Tag.find({ deleted: false });
+    const tags = await Tag.find({ deleted: false, user: req.user._id }).select(
+      "-user -createdAt -updatedAt -deleted"
+    );
     res.json(tags);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
@@ -16,9 +18,11 @@ exports.createTag = async (req, res) => {
     if (!label) {
       return res.status(400).json({ error: "Label is required" });
     }
-    const newTag = new Tag({ label });
+    const newTag = new Tag({ label, user: req.user._id });
     const savedTag = await newTag.save();
-    res.status(201).json(savedTag);
+    const { user, createdAt, updatedAt, deleted, ...tagResponse } =
+      savedTag.toObject();
+    res.status(201).json(tagResponse);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
@@ -30,6 +34,7 @@ exports.deleteTag = async (req, res) => {
     const tag = await Tag.findOne({
       _id: mongoose.Types.ObjectId.createFromHexString(tagId),
       deleted: false,
+      user: req.user._id,
     });
     if (!tag) {
       return res.status(404).json({ error: "Tag not found" });
@@ -54,10 +59,11 @@ exports.updateTag = async (req, res) => {
       {
         _id: mongoose.Types.ObjectId.createFromHexString(tagId),
         deleted: false,
+        user: req.user._id,
       },
       { label },
       { new: true }
-    );
+    ).select("-user -createdAt -updatedAt -deleted");
     if (!tag) {
       return res.status(404).json({ error: "Tag not found" });
     }

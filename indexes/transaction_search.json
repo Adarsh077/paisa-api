@@ -19,6 +19,9 @@
       },
       "type": {
         "type": "string"
+      },
+      "user": {
+        "type": "objectId"
       }
     }
   }

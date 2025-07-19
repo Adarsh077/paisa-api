@@ -1,12 +1,14 @@
 const express = require("express");
-const tagRoutes = require("./routes/tag.routes");
-const transactionRoutes = require("./routes/transaction.routes");
+const authenticate = require("./middleware/authenticate");
 
 const app = express();
-
 app.use(express.json());
 
-app.use("/tags", tagRoutes);
-app.use("/transactions", transactionRoutes);
+app.use("/users", require("./routes/user.routes"));
+
+app.use(authenticate);
+
+app.use("/tags", require("./routes/tag.routes"));
+app.use("/transactions", require("./routes/transaction.routes"));
 
 module.exports = app;

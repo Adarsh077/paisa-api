@@ -15,7 +15,7 @@ exports.getAllTransactions = async (req, res) => {
       _ids,
     } = req.query;
 
-    const filter = { deleted: false };
+    const filter = { deleted: false, user: req.user._id };
     const limitNum = Math.min(parseInt(limit, 10) || 20, 100); // Max 100 items per page
 
     if (type) {
@@ -68,7 +68,8 @@ exports.getAllTransactions = async (req, res) => {
     const sortOrder = { date: -1 };
 
     const transactions = await Transaction.find(filter)
-      .populate("tags")
+      .populate("tags", "-user -createdAt -updatedAt -deleted")
+      .select("-user -createdAt -updatedAt -deleted")
       .sort(sortOrder)
       .limit(limitNum + 1); // Fetch one extra to check if there are more
 
@@ -107,7 +108,10 @@ exports.getTransactionById = async (req, res) => {
     const transaction = await Transaction.findOne({
       _id: mongoose.Types.ObjectId.createFromHexString(transactionId),
       deleted: false,
-    }).populate("tags");
+      user: req.user._id,
+    })
+      .populate("tags", "-user -createdAt -updatedAt -deleted")
+      .select("-user -createdAt -updatedAt -deleted");
     if (!transaction) {
       return res.status(404).json({ error: "Transaction not found" });
     }
@@ -134,9 +138,12 @@ exports.createTransaction = async (req, res) => {
       type,
       tags,
       date,
+      user: req.user._id,
     });
     const savedTransaction = await newTransaction.save();
-    res.status(201).json(savedTransaction);
+    const { user, createdAt, updatedAt, deleted, ...transactionResponse } =
+      savedTransaction.toObject();
+    res.status(201).json(transactionResponse);
   } catch (err) {
     console.log(err);
     res.status(500).json({ error: "Server error" });
@@ -157,10 +164,11 @@ exports.updateTransaction = async (req, res) => {
       {
         _id: mongoose.Types.ObjectId.createFromHexString(transactionId),
         deleted: false,
+        user: req.user._id,
       },
       update,
       { new: true }
-    );
+    ).select("-user -createdAt -updatedAt -deleted");
     if (!transaction) {
       return res.status(404).json({ error: "Transaction not found" });
     }
@@ -179,6 +187,7 @@ exports.deleteTransaction = async (req, res) => {
     const transaction = await Transaction.findOne({
       _id: mongoose.Types.ObjectId.createFromHexString(transactionId),
       deleted: false,
+      user: req.user._id,
     });
     if (!transaction) {
       return res.status(404).json({ error: "Transaction not found" });
@@ -216,11 +225,18 @@ exports.searchTransactions = async (req, res) => {
     const skip = (pageNum - 1) * limitNum;
     const must = [];
 
-    // Always exclude deleted
+    // Always exclude deleted and filter by user
     must.push({
       equals: {
         path: "deleted",
         value: false,
+      },
+    });
+
+    must.push({
+      equals: {
+        path: "user",
+        value: req.user._id,
       },
     });
 
@@ -303,6 +319,17 @@ exports.searchTransactions = async (req, res) => {
         if (!project.hasOwnProperty("_id")) project["_id"] = 1;
         pipeline.push({ $project: project });
       }
+    } else {
+      // Default projection to exclude unwanted fields
+      pipeline.push({
+        $project: {
+          user: 0,
+          deleted: 0,
+          createdAt: 0,
+          updatedAt: 0,
+          __v: 0,
+        },
+      });
     }
 
     const results = await Transaction.aggregate(pipeline);

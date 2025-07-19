@@ -6,6 +6,11 @@ const transactionSchema = new mongoose.Schema(
     amount: { type: Number, required: true },
     type: { type: String, enum: ["income", "expense"], required: true },
     tags: [{ type: mongoose.Schema.Types.ObjectId, ref: "tags" }],
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "users",
+      required: true,
+    },
     date: { type: Date, required: true, default: Date.now },
     deleted: { type: Boolean, default: false },
   },
