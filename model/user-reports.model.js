@@ -1,13 +1,5 @@
 const mongoose = require("mongoose");
 
-const messageSchema = new mongoose.Schema(
-  {
-    role: { type: String, required: true },
-    content: { type: String, required: true },
-  },
-  { _id: false }
-);
-
 const userReportSchema = new mongoose.Schema(
   {
     type: {
@@ -27,7 +19,10 @@ const userReportSchema = new mongoose.Schema(
       ref: "users",
     },
     description: { type: String },
-    messages: [messageSchema],
+    messages: {
+      type: [Object],
+      default: [],
+    },
     deleted: { type: Boolean, default: false },
   },
   { timestamps: true }
