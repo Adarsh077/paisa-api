@@ -10,5 +10,6 @@ app.use(authenticate);
 
 app.use("/tags", require("./routes/tag.routes"));
 app.use("/transactions", require("./routes/transaction.routes"));
+app.use("/user-reports", require("./routes/user-reports.routes"));
 
 module.exports = app;
